@@ -161,7 +161,7 @@ InitMaps <- function(sim) {
   allowedStudyAreaNames <- c("ANC", "AlPac", "BlueRidge", "DMI", "Edson", "FMANWT", "FMU",
                              "LandWeb", "LP", "Manning", "MillarWestern", "Mistik", "MPR",
                              "provAB", "provMB", "provNWT", "provSK", "random",
-                             "SprayLake", "Sundre", "Tolko", "Vanderwell", "WeyCo", "WestFraser")
+                             "SprayLake", "Sundre", "Tolko", "Vanderwell", "WeyCo", "WestFraser", "NW_AB")
   if (!grepl(paste(allowedStudyAreaNames, collapse = "|"), P(sim)$.studyAreaName)) {
     stop(".studyAreaName, ", P(sim)$.studyAreaName, ", does not contain valid study area name.\n",
          "Study area name must be one of:\n", paste(allowedStudyAreaNames, collapse = ", "), ".")
@@ -174,22 +174,26 @@ InitMaps <- function(sim) {
   ## TODO: use terra
   opts <- options(reproducible.useTerra = FALSE)
 
-  if (grepl("SprayLake", P(sim)$.studyAreaName)) {
-    ## 2024-09-23 per Dave, use custom lthfc only for Spray Lake + C5 runs;
-    ## LTHFCS are *much* lower (200/150 reduced to 50 in eastern portion of study area)
-    # lthfc_url <- "https://drive.google.com/file/d/1vvwqlS0hrD2s7Eq4N7NKrRDKWon4RvUw" ## ltfc_sls_v2.shp
-    lthfc_url <- "https://drive.google.com/file/d/1udhnNh_zWap1fORuDMYVUXWQ0bNeeRAT" ## ltfc_sls_v3.shp
+  if (grepl("NW_AB", P(sim)$.studyAreaName)) {
+    ## October2025 - Erik edited Spray Lake and changed to NW_AB for the NRV FIRE HISTORY PROJECT landweb run
+    ## Study area will only be Nw AB
+    lthfc_url <- "https://drive.google.com/file/d/1vB1diojxBT4Zr7hTxdj-fx44SvSQL1Ls" ## # .gpkg on Drive
+    layerName <- "NW_AB_LTHFC_OptionC"  # or "NW_AB_LTHFC_OptionB" / "NW_AB_LTHFC_OptionA" Will just do one at a time
   } else {
     # lthfc_url <- "https://drive.google.com/file/d/1JptU0R7qsHOEAEkxybx5MGg650KC98c6" ## landweb_ltfc_v6.shp
     # lthfc_url <- "https://drive.google.com/file/d/1eu5TJS1NhzqbnDenyiBy2hAnVI1E3lsC" ## landweb_ltfc_v8.shp
     # lthfc_url <- "https://drive.google.com/file/d/1wNxOeV1vl05WDp6DsyuyRSbDZOu87N17" ## landweb_ltfc_v8a.shp
     lthfc_url <- "https://drive.google.com/file/d/1R9QLvW_yD482xv_6ZF1yhB32blaDPWjV" ## landweb_ltfc_v8c.shp
   }
-  lthfc <- prepInputs(
-    url = lthfc_url,
-    targetCRS = targetCRS,
-    overwrite = TRUE,
-    filename2 = NULL
+ 
+  lthfc <- reproducible::prepInputs(      #Had to run this code for code to recognize .gpkg
+    url             = lthfc_url,
+    targetFile      = "LTHFC_NW_AB.gpkg",
+    destinationPath = dataPath(sim),
+    fun             = "sf::st_read",                     # was "terra::vect"
+    funArgs         = list(layer = "NW_AB_LTHFC_OptionC", quiet = TRUE),
+    overwrite       = TRUE,
+    useCache        = FALSE                              # prevent returning cached SpatVector
   )
   options(opts)
 
@@ -253,10 +257,16 @@ InitMaps <- function(sim) {
 
   ## AB FMU boundaries
   ## TODO: only add if studyAreaReporting in AB
+  # ml <- mapAdd(map = ml, layerName = "AB FMU Boundaries",
+  #              useSAcrs = TRUE, poly = TRUE, overwrite = TRUE,
+  #              url = "https://drive.google.com/open?id=1OH3b5pwjumm1ToytDBDI6jthVe2pp0tS", # 2020-06
+  #              columnNameForLabels = "FMU_NAME", isStudyArea = FALSE, filename2 = NULL)
+
   ml <- mapAdd(map = ml, layerName = "AB FMU Boundaries",
                useSAcrs = TRUE, poly = TRUE, overwrite = TRUE,
-               url = "https://drive.google.com/open?id=1OH3b5pwjumm1ToytDBDI6jthVe2pp0tS", # 2020-06
+               url = "https://drive.google.com/file/d/1OH3b5pwjumm1ToytDBDI6jthVe2pp0tS", # 2025 FMU Update
                columnNameForLabels = "FMU_NAME", isStudyArea = FALSE, filename2 = NULL)
+
 
   ### Rename some polygons:
   ###   - DMI is now Mercer (MPR)
@@ -288,19 +298,19 @@ InitMaps <- function(sim) {
 
   ## BC biogeoclimatic zones
   ## TODO: only add if studyAreaReporting in BC
-  ml <- mapAdd(map = ml, layerName = "BC Biogeoclimatic zones",
-               useSAcrs = TRUE, poly = TRUE, overwrite = TRUE,
-               url = "https://drive.google.com/file/d/1NS15Gd7dHEhvPOy-Ol_LBtf-4Ch6mPnS",
-               columnNameForLabels = "ZONE_NAME", isStudyArea = FALSE, filename2 = NULL)
-  ml[["BC Biogeoclimatic zones"]][["Name"]] <- ml[["BC Biogeoclimatic zones"]][["ZONE_NAME"]]
+  # ml <- mapAdd(map = ml, layerName = "BC Biogeoclimatic zones",
+  #              useSAcrs = TRUE, poly = TRUE, overwrite = TRUE,
+  #              url = "https://drive.google.com/file/d/1NS15Gd7dHEhvPOy-Ol_LBtf-4Ch6mPnS",
+  #              columnNameForLabels = "ZONE_NAME", isStudyArea = FALSE, filename2 = NULL)
+  # ml[["BC Biogeoclimatic zones"]][["Name"]] <- ml[["BC Biogeoclimatic zones"]][["ZONE_NAME"]]
 
   ## NWT ecoregions
   ## TODO: only add if studyAreaReporting in NWT
-  ml <- mapAdd(map = ml, layerName = "Northwest Territories Ecoregions",
-               useSAcrs = TRUE, poly = TRUE, overwrite = TRUE,
-               url = "https://drive.google.com/file/d/1iRAQfARkmS6-XVHFnTkB-iltzMNPAczC",
-               columnNameForLabels = "ECO4_NAM_1", isStudyArea = FALSE, filename2 = NULL)
-  ml[["Northwest Territories Ecoregions"]][["Name"]] <- ml[["Northwest Territories Ecoregions"]][["ECO4_NAM_1"]]
+  # ml <- mapAdd(map = ml, layerName = "Northwest Territories Ecoregions",
+  #              useSAcrs = TRUE, poly = TRUE, overwrite = TRUE,
+  #              url = "https://drive.google.com/file/d/1iRAQfARkmS6-XVHFnTkB-iltzMNPAczC",
+  #              columnNameForLabels = "ECO4_NAM_1", isStudyArea = FALSE, filename2 = NULL)
+  # ml[["Northwest Territories Ecoregions"]][["Name"]] <- ml[["Northwest Territories Ecoregions"]][["ECO4_NAM_1"]]
 
   ## Caribou Ranges
   # ml <- mapAdd(map = ml, layerName = "Boreal Caribou Ranges",
@@ -315,21 +325,21 @@ InitMaps <- function(sim) {
   #              useSAcrs = TRUE, poly = TRUE, overwrite = TRUE,
   #              url = "https://extranet.gov.ab.ca/srd/geodiscover/srd_pub/LAT/FWDSensitivity/CaribouRange.zip",
   #              columnNameForLabels = "SUBUNIT", isStudyArea = FALSE, filename2 = NULL) ## untested
-  ml <- mapAdd(map = ml, layerName = "SK Caribou Ranges",
-               useSAcrs = TRUE, poly = TRUE, overwrite = TRUE,
-               url = "https://drive.google.com/file/d/1LiizDyXOfJPQ76FQM8SQ1_kYG9hJUDdK",
-               columnNameForLabels = "RGEUNIT", isStudyArea = FALSE, filename2 = NULL)
-  ml[["SK Caribou Ranges"]][["Name"]] <- ml[["SK Caribou Ranges"]][["RGEUNIT"]]
-
-  if (grepl("provMB", P(sim)$.studyAreaName)) {
-    ## TODO: .zipx file; needs 'manual' extract 1st time
-    ml <- mapAdd(map = ml, layerName = "MB Caribou Ranges",
-                 useSAcrs = TRUE, poly = TRUE, overwrite = TRUE,
-                 url = "https://drive.google.com/file/d/1Y_Qi3twoU3fHaNgMzF5QEl1CosGmGyha/",
-                 targetFile = "Boreal_caribou_MUs_MB_2015.shp", alsoExtract = "similar",
-                 columnNameForLabels = "RANGE_NAME", isStudyArea = FALSE, filename2 = NULL)
-    ml[["MB Caribou Ranges"]][["Name"]] <- ml[["MB Caribou Ranges"]][["RANGE_NAME"]]
-  }
+  # ml <- mapAdd(map = ml, layerName = "SK Caribou Ranges",
+  #              useSAcrs = TRUE, poly = TRUE, overwrite = TRUE,
+  #              url = "https://drive.google.com/file/d/1LiizDyXOfJPQ76FQM8SQ1_kYG9hJUDdK",
+  #              columnNameForLabels = "RGEUNIT", isStudyArea = FALSE, filename2 = NULL)
+  # ml[["SK Caribou Ranges"]][["Name"]] <- ml[["SK Caribou Ranges"]][["RGEUNIT"]]
+  #
+  # if (grepl("provMB", P(sim)$.studyAreaName)) {
+  #   ## TODO: .zipx file; needs 'manual' extract 1st time
+  #   ml <- mapAdd(map = ml, layerName = "MB Caribou Ranges",
+  #                useSAcrs = TRUE, poly = TRUE, overwrite = TRUE,
+  #                url = "https://drive.google.com/file/d/1Y_Qi3twoU3fHaNgMzF5QEl1CosGmGyha/",
+  #                targetFile = "Boreal_caribou_MUs_MB_2015.shp", alsoExtract = "similar",
+  #                columnNameForLabels = "RANGE_NAME", isStudyArea = FALSE, filename2 = NULL)
+  #   ml[["MB Caribou Ranges"]][["Name"]] <- ml[["MB Caribou Ranges"]][["RANGE_NAME"]]
+  # }
 
   ml <- mapAdd(map = ml, layerName = "LandWeb Caribou Ranges",
                useSAcrs = TRUE, poly = TRUE, overwrite = TRUE,
@@ -385,6 +395,8 @@ InitMaps <- function(sim) {
     ml <- provMB(ml, P(sim)$.studyAreaName, dataDir, sim$canProvs, P(sim)$bufferDist, asStudyArea = TRUE)
   } else if (grepl("provNWT", P(sim)$.studyAreaName)) {
     ml <- provNWT(ml, P(sim)$.studyAreaName, dataDir, sim$canProvs, P(sim)$bufferDist, asStudyArea = TRUE)
+  } else if (grepl("NW_AB", P(sim)$.studyAreaName)) {
+    ml <- NW_AB(ml, P(sim)$.studyAreaName, dataDir, sim$canProvs, P(sim)$bufferDist, asStudyArea = TRUE)
   } else if (grepl("provSK", P(sim)$.studyAreaName)) {
     ml <- provSK(ml, P(sim)$.studyAreaName, dataDir, sim$canProvs, P(sim)$bufferDist, asStudyArea = TRUE)
   } else if (grepl("random", P(sim)$.studyAreaName)) {
@@ -414,8 +426,25 @@ InitMaps <- function(sim) {
 
   ## study areas ---------------------------------------------------------------------------------
   sim$studyArea <- studyArea(ml, 3)           ## buffered study area
-  #sim$studyAreaLarge <- studyArea(ml, 1)     ## entire LandWeb area (too big for fitting etc. for now)
-  sim$studyAreaLarge <- amc::outerBuffer(studyArea(ml, 2), P(sim)$bufferDistLarge) ## further buffered study area
+
+  sa2 <- studyArea(ml, 2)
+  bd  <- P(sim)$bufferDistLarge
+
+  if (inherits(sa2, "sf")) {
+    # union -> make valid -> buffer -> wrap as sf with an attribute
+    buf <- sf::st_buffer(sf::st_make_valid(sf::st_union(sa2)), dist = bd)  # sfc
+    sim$studyAreaLarge <- sf::st_sf(Name = "studyAreaLarge", geometry = buf)
+  } else {
+    # keep sp path, then convert to sf and add Name
+    buf_sp <- amc::outerBuffer(sa2, bd)
+    sim$studyAreaLarge <- sf::st_as_sf(buf_sp)
+    if (!"Name" %in% names(sim$studyAreaLarge))
+      sim$studyAreaLarge$Name <- "studyAreaLarge"
+  }
+
+  # Convert to Spatial so downstream modules don't see an sfc
+  sim$studyAreaLarge <- methods::as(sim$studyAreaLarge, "Spatial")
+
   sim$studyAreaReporting <- studyArea(ml, 2)  ## reporting area (e.g., FMA)
 
   ## LCC 2005 / raster to match ------------------------------------------------------------------
@@ -575,9 +604,11 @@ InitMaps <- function(sim) {
   sim$rstFlammable <- crop(sim$rstFlammable, sim$rasterToMatch) ## ensure it matches studyArea
 
   ## fireReturnInterval needs to be masked by rstFlammable
-  rstFireReturnInterval <- fasterize::fasterize(sf::st_as_sf(ml[["LTHFC"]]),
+  rstFireReturnInterval <- fasterize::fasterize(sf::st_transform(sf::st_as_sf(ml[["LTHFC"]]),
+                                                                 sf::st_crs(rasterToMatch(ml))),
                                                 raster = rasterToMatch(ml),
-                                                field = "fireReturnInterval")
+                                                field  = "fireReturnInterval"
+  )
   rstFireReturnInterval <- crop(rstFireReturnInterval, sim$rasterToMatch) ## ensure it matches studyArea
 
   if (!is.integer(rstFireReturnInterval[])) {
