@@ -465,6 +465,30 @@ InitMaps <- function(sim) {
   sim$rasterToMatchLarge <- LCC2005large
   sim$rasterToMatchReporting <- postProcess(rasterToMatch(ml), studyArea = sim$studyAreaReporting, filename2 = NULL)
 
+  # PATCH: assign unique factor grouping fields to each reporting raster
+  for (rname in c("rasterToMatch", "rasterToMatchLarge", "rasterToMatchReporting")) {
+    r <- sim[[rname]]
+    if (inherits(r, "RasterLayer")) {
+      # Only patch if raster is a grouping mask (i.e., all cells same, or small number of IDs)
+      uniq_vals <- unique(r[])
+      uniq_vals <- uniq_vals[!is.na(uniq_vals)]
+      n_unique <- length(uniq_vals)
+      if (n_unique == 1 && !is.na(uniq_vals[1])) {  # group mask, e.g. all 1's
+        lvl_df <- data.frame(ID = uniq_vals)
+        possible_fields <- c("shinyLabel", "ID", "Name", "zone")
+        for (nm in possible_fields) lvl_df[[nm]] <- as.factor("NW_AB")
+        levels(r) <- list(lvl_df)       # MUST be a single data.frame inside a list!
+        sim[[rname]] <- r
+        message(sprintf("Patched levels for: %s", rname))
+        print(levels(r))
+      } else {
+        message(sprintf("Did NOT patch %s: not a group mask (found %d unique values)", rname, n_unique))
+        # Do nothing; it's not a categorical mask
+      }
+    }
+  }
+
+
   ## Current Conditions --------------------------------------------------------------------------
 
   ## Manitoba uses current conditions layers (2016) which cover the province;
