@@ -35,6 +35,8 @@ defineModule(sim, list(
                     "Multiplication factor for adjusting fire return intervals."),
     defineParameter("dispersalType", "character", "default", NA, NA,
                     "One of 'aspen', 'high', 'none', or 'default'."),
+    defineParameter("lthfc_option", "character", "NW_AB_LTHFC_OptionB", NA, NA,
+                    "One of 'NW_AB_LTHFC_OptionA', 'NW_AB_LTHFC_OptionB', 'NW_AB_LTHFC_OptionC'"),
     defineParameter("mergeSlivers", "logical", FALSE, NA, NA,
                     "Should sliver polygons in LTHFC map be merged into nearest non-zero polygon?"),
     defineParameter("minFRI", "numeric", 40, 0, 200,
@@ -138,6 +140,8 @@ doEvent.LandWeb_preamble = function(sim, eventTime, eventType) {
   switch(
     eventType,
     init = {
+      mod$dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
+      message(currentModule(sim), ": using dataPath '", mod$dPath, "'.")
       sim <- InitMaps(sim)
       sim <- InitSpecies(sim)
       sim <- InitLandMine(sim)
@@ -175,23 +179,24 @@ InitMaps <- function(sim) {
   opts <- options(reproducible.useTerra = FALSE)
 
   if (grepl("NW_AB", P(sim)$.studyAreaName)) {
-    ## October2025 - Erik edited Spray Lake and changed to NW_AB for the NRV FIRE HISTORY PROJECT landweb run
     ## Study area will only be Nw AB
     lthfc_url <- "https://drive.google.com/file/d/1vB1diojxBT4Zr7hTxdj-fx44SvSQL1Ls" ## # .gpkg on Drive
-    layerName <- "NW_AB_LTHFC_OptionC"  # or "NW_AB_LTHFC_OptionB" / "NW_AB_LTHFC_OptionA" Will just do one at a time
+    stopifnot(P(sim)$lthfc_option %in% c('NW_AB_LTHFC_OptionA', 'NW_AB_LTHFC_OptionB', 'NW_AB_LTHFC_OptionC'))
+    layerName <- P(sim)$lthfc_option
+
   } else {
     # lthfc_url <- "https://drive.google.com/file/d/1JptU0R7qsHOEAEkxybx5MGg650KC98c6" ## landweb_ltfc_v6.shp
     # lthfc_url <- "https://drive.google.com/file/d/1eu5TJS1NhzqbnDenyiBy2hAnVI1E3lsC" ## landweb_ltfc_v8.shp
     # lthfc_url <- "https://drive.google.com/file/d/1wNxOeV1vl05WDp6DsyuyRSbDZOu87N17" ## landweb_ltfc_v8a.shp
     lthfc_url <- "https://drive.google.com/file/d/1R9QLvW_yD482xv_6ZF1yhB32blaDPWjV" ## landweb_ltfc_v8c.shp
   }
- 
+
   lthfc <- reproducible::prepInputs(      #Had to run this code for code to recognize .gpkg
     url             = lthfc_url,
     targetFile      = "LTHFC_NW_AB.gpkg",
     destinationPath = dataPath(sim),
     fun             = "sf::st_read",                     # was "terra::vect"
-    funArgs         = list(layer = "NW_AB_LTHFC_OptionC", quiet = TRUE),
+    layer = layerName, quiet = TRUE,
     overwrite       = TRUE,
     useCache        = FALSE                              # prevent returning cached SpatVector
   )
@@ -465,28 +470,28 @@ InitMaps <- function(sim) {
   sim$rasterToMatchLarge <- LCC2005large
   sim$rasterToMatchReporting <- postProcess(rasterToMatch(ml), studyArea = sim$studyAreaReporting, filename2 = NULL)
 
-  # PATCH: assign unique factor grouping fields to each reporting raster
-  for (rname in c("rasterToMatch", "rasterToMatchLarge", "rasterToMatchReporting")) {
-    r <- sim[[rname]]
-    if (inherits(r, "RasterLayer")) {
-      # Only patch if raster is a grouping mask (i.e., all cells same, or small number of IDs)
-      uniq_vals <- unique(r[])
-      uniq_vals <- uniq_vals[!is.na(uniq_vals)]
-      n_unique <- length(uniq_vals)
-      if (n_unique == 1 && !is.na(uniq_vals[1])) {  # group mask, e.g. all 1's
-        lvl_df <- data.frame(ID = uniq_vals)
-        possible_fields <- c("shinyLabel", "ID", "Name", "zone")
-        for (nm in possible_fields) lvl_df[[nm]] <- as.factor("NW_AB")
-        levels(r) <- list(lvl_df)       # MUST be a single data.frame inside a list!
-        sim[[rname]] <- r
-        message(sprintf("Patched levels for: %s", rname))
-        print(levels(r))
-      } else {
-        message(sprintf("Did NOT patch %s: not a group mask (found %d unique values)", rname, n_unique))
-        # Do nothing; it's not a categorical mask
-      }
-    }
-  }
+  # # PATCH: assign unique factor grouping fields to each reporting raster
+  # for (rname in c("rasterToMatch", "rasterToMatchLarge", "rasterToMatchReporting")) {
+  #   r <- sim[[rname]]
+  #   if (inherits(r, "RasterLayer")) {
+  #     # Only patch if raster is a grouping mask (i.e., all cells same, or small number of IDs)
+  #     uniq_vals <- unique(r[])
+  #     uniq_vals <- uniq_vals[!is.na(uniq_vals)]
+  #     n_unique <- length(uniq_vals)
+  #     if (n_unique == 1 && !is.na(uniq_vals[1])) {  # group mask, e.g. all 1's
+  #       lvl_df <- data.frame(ID = uniq_vals)
+  #       possible_fields <- c("shinyLabel", "ID", "Name", "zone")
+  #       for (nm in possible_fields) lvl_df[[nm]] <- as.factor("NW_AB")
+  #       levels(r) <- list(lvl_df)       # MUST be a single data.frame inside a list!
+  #       sim[[rname]] <- r
+  #       message(sprintf("Patched levels for: %s", rname))
+  #       print(levels(r))
+  #     } else {
+  #       message(sprintf("Did NOT patch %s: not a group mask (found %d unique values)", rname, n_unique))
+  #       # Do nothing; it's not a categorical mask
+  #     }
+  #   }
+  # }
 
 
   ## Current Conditions --------------------------------------------------------------------------
@@ -843,7 +848,7 @@ PlotMaps <- function(sim) {
     })
     quickPlot::dev(2, width = 18, height = 10)
     grid::grid.rect(0.90, 0.03, width = 0.2, height = 0.06, gp = gpar(fill = "white", col = "white"))
-    grid::grid.text(label = P(sim)$.studyAreaName, x = 0.90, y = 0.03)
+    grid::grid.text(label = P(sim)$.studyAreaNaFme, x = 0.90, y = 0.03)
   }
   Plot(sim$studyAreaReporting, sim$studyArea, sim$studyAreaLarge,
        sim$rasterToMatchReporting, sim$rasterToMatch, sim$rasterToMatchLarge)
